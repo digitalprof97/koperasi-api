@@ -10,20 +10,24 @@ RUN apt-get update && apt-get install -y \
     git \
     && docker-php-ext-install pdo_mysql mbstring bcmath
 
-# Aktifkan modul rewrite Apache
+# Aktifkan mod_rewrite Apache
 RUN a2enmod rewrite
 
-# Konfigurasi Apache DocumentRoot langsung ke /public dan aktifkan AllowOverride All
-ENV APACHE_DOCUMENT_ROOT /var/www/html/public
-RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
-RUN sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
+# Ganti konfigurasi VirtualHost default Apache secara penuh
+RUN printf '<VirtualHost *:80>\n\
+    ServerAdmin webmaster@localhost\n\
+    DocumentRoot /var/www/html/public\n\
+    <Directory /var/www/html/public>\n\
+        Options -Indexes +FollowSymLinks\n\
+        AllowOverride All\n\
+        Require all granted\n\
+    </Directory>\n\
+    ErrorLog ${APACHE_LOG_DIR}/error.log\n\
+    CustomLog ${APACHE_LOG_DIR}/access.log combined\n\
+</VirtualHost>\n' > /etc/apache2/sites-available/000-default.conf
 
-# Buka izin override di direktori public
-RUN echo '<Directory /var/www/html/public>\n\
-    Options Indexes FollowSymLinks\n\
-    AllowOverride All\n\
-    Require all granted\n\
-</Directory>' >> /etc/apache2/apache2.conf
+# Ubah permission direktori root global Apache agar menerima AllowOverride
+RUN sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf
 
 # Pasang Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -31,14 +35,14 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 WORKDIR /var/www/html
 COPY . /var/www/html
 
-# Install vendor dependencies
+# Install vendor Laravel
 RUN composer install --no-dev --optimize-autoloader
 
-# Atur izin direktori storage dan cache
+# Atur permissions direktori Laravel
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 RUN chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
 EXPOSE 80
 
-# Jalankan Apache setelah membersihkan cache route lama
+# Bersihkan cache route lama dan jalankan server
 CMD php artisan optimize:clear && apache2-foreground
