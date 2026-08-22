@@ -1,6 +1,6 @@
 FROM php:8.1-apache
 
-# Install ekstensi dan modul Laravel
+# Install ekstensi database & dependensi
 RUN apt-get update && apt-get install -y \
     libpng-dev \
     libonig-dev \
@@ -10,17 +10,18 @@ RUN apt-get update && apt-get install -y \
     git \
     && docker-php-ext-install pdo_mysql mbstring bcmath
 
-# Aktifkan rewrite engine Apache
+# Aktifkan modul rewrite Apache
 RUN a2enmod rewrite
 
-# Ubah DocumentRoot Apache ke folder public
-ENV APACHE_DOCUMENT_ROOT /var/www/html/public
-
-RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
-RUN sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
-
-# Buka izin AllowOverride All agar .htaccess Laravel aktif
-RUN sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf
+# Buat konfigurasi virtual host Apache yang memaksa URL rewriting Laravel
+RUN echo '<VirtualHost *:80>\n\
+    DocumentRoot /var/www/html/public\n\
+    <Directory /var/www/html/public>\n\
+        Options -Indexes +FollowSymLinks\n\
+        AllowOverride All\n\
+        Require all granted\n\
+    </Directory>\n\
+</VirtualHost>' > /etc/apache2/sites-available/000-default.conf
 
 # Pasang Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -28,10 +29,10 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 WORKDIR /var/www/html
 COPY . /var/www/html
 
-# Install package Laravel
+# Install vendor dependencies
 RUN composer install --no-dev --optimize-autoloader
 
-# Atur permissions direktori
+# Atur permissions
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 RUN chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
