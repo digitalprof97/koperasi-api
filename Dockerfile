@@ -1,6 +1,6 @@
 FROM php:8.1-cli
 
-# Install dependencies dan modul database MySQL
+# Install dependensi dan ekstensi database PDO MySQL
 RUN apt-get update && apt-get install -y \
     libpng-dev \
     libonig-dev \
@@ -16,11 +16,14 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 WORKDIR /var/www/html
 COPY . /var/www/html
 
-# Install dependensi Laravel
+# Install vendor dependencies
 RUN composer install --no-dev --optimize-autoloader
 
-# Atur permissions direktori storage & cache
+# Atur permissions Laravel
 RUN chmod -R 777 /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Jalankan server bawaan Laravel pada port dinamis Railway
-CMD sh -c "php -S 0.0.0.0:${PORT:-80} -t public"
+# Expose port
+EXPOSE 8080
+
+# Jalankan artisan serve langsung mengikat ke 0.0.0.0 dan port 8080
+CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8080"]
