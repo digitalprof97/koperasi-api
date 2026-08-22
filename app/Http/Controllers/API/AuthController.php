@@ -15,13 +15,17 @@ class AuthController extends Controller
 {
     public function login(Request $request)
     {
+        // Otomatis ubah role ke lowercase (misal 'ADMIN' jadi 'admin')
+        $role = strtolower((string) $request->input('role', ''));
+        $request->merge(['role' => $role]);
+
         $request->validate([
             'username' => 'required',
             'password' => 'required',
-            'role' => 'required|in:jemaat,admin'
+            'role'     => 'required|in:jemaat,admin'
         ]);
 
-        if ($request->role === 'jemaat') {
+        if ($role === 'jemaat') {
             $user = DB::table('tb_jemaat')
                 ->where('no_anggota', $request->username)
                 ->orWhere('email', $request->username)
@@ -32,10 +36,10 @@ class AuthController extends Controller
                 $token = $user->id_jemaat . '|' . bin2hex(random_bytes(32));
                 
                 return response()->json([
-                    'status' => true,
-                    'role' => 'jemaat',
-                    'user' => $user,
-                    'token' => $token,
+                    'status'  => true,
+                    'role'    => 'jemaat',
+                    'user'    => $user,
+                    'token'   => $token,
                     'message' => 'Login berhasil'
                 ]);
             }
@@ -49,20 +53,26 @@ class AuthController extends Controller
                 // Token sederhana tanpa sanctum model
                 $token = $user->id_admin . '|' . bin2hex(random_bytes(32));
                 
-                LogActivity::log($user->id_admin, 'Login', 'Admin login ke sistem');
+                try {
+                    if (class_exists(LogActivity::class)) {
+                        LogActivity::log($user->id_admin, 'Login', 'Admin login ke sistem');
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('LogActivity error: ' . $e->getMessage());
+                }
                 
                 return response()->json([
-                    'status' => true,
-                    'role' => 'admin',
-                    'user' => $user,
-                    'token' => $token,
+                    'status'  => true,
+                    'role'    => 'admin',
+                    'user'    => $user,
+                    'token'   => $token,
                     'message' => 'Login berhasil'
                 ]);
             }
         }
 
         return response()->json([
-            'status' => false,
+            'status'  => false,
             'message' => 'Username atau password salah'
         ], 401);
     }
@@ -74,7 +84,7 @@ class AuthController extends Controller
             $token = $request->bearerToken();
             if (!$token) {
                 return response()->json([
-                    'status' => false,
+                    'status'  => false,
                     'message' => 'Token tidak ditemukan'
                 ], 401);
             }
@@ -90,19 +100,19 @@ class AuthController extends Controller
 
             if (!$admin) {
                 return response()->json([
-                    'status' => false,
+                    'status'  => false,
                     'message' => 'Admin tidak ditemukan'
                 ], 404);
             }
 
             return response()->json([
                 'status' => true,
-                'data' => $admin
+                'data'   => $admin
             ]);
         } catch (\Exception $e) {
             Log::error('Profil error: ' . $e->getMessage());
             return response()->json([
-                'status' => false,
+                'status'  => false,
                 'message' => $e->getMessage()
             ], 500);
         }
@@ -113,15 +123,15 @@ class AuthController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'nama_lengkap' => 'required|string|max:100',
-                'email' => 'nullable|email|max:100',
-                'no_hp' => 'nullable|string|max:15',
+                'email'        => 'nullable|email|max:100',
+                'no_hp'        => 'nullable|string|max:15',
             ]);
 
             if ($validator->fails()) {
                 return response()->json([
-                    'status' => false,
+                    'status'  => false,
                     'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
+                    'errors'  => $validator->errors()
                 ], 422);
             }
 
@@ -133,20 +143,26 @@ class AuthController extends Controller
                 ->where('id_admin', $adminId)
                 ->update([
                     'nama_lengkap' => $request->nama_lengkap,
-                    'email' => $request->email,
-                    'no_hp' => $request->no_hp,
-                    'updated_at' => now(),
+                    'email'        => $request->email,
+                    'no_hp'        => $request->no_hp,
+                    'updated_at'   => now(),
                 ]);
 
-            LogActivity::log($adminId, 'Update Profil', 'Admin mengupdate profil');
+            try {
+                if (class_exists(LogActivity::class)) {
+                    LogActivity::log($adminId, 'Update Profil', 'Admin mengupdate profil');
+                }
+            } catch (\Throwable $e) {
+                Log::warning('LogActivity error: ' . $e->getMessage());
+            }
 
             return response()->json([
-                'status' => true,
+                'status'  => true,
                 'message' => 'Profil berhasil diupdate'
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                'status' => false,
+                'status'  => false,
                 'message' => $e->getMessage()
             ], 500);
         }
@@ -156,16 +172,16 @@ class AuthController extends Controller
     {
         try {
             $validator = Validator::make($request->all(), [
-                'password_lama' => 'required|string',
-                'password_baru' => 'required|string|min:4',
+                'password_lama'       => 'required|string',
+                'password_baru'       => 'required|string|min:4',
                 'konfirmasi_password' => 'required|same:password_baru',
             ]);
 
             if ($validator->fails()) {
                 return response()->json([
-                    'status' => false,
+                    'status'  => false,
                     'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
+                    'errors'  => $validator->errors()
                 ], 422);
             }
 
@@ -177,9 +193,9 @@ class AuthController extends Controller
                 ->where('id_admin', $adminId)
                 ->first();
 
-            if ($request->password_lama != $admin->password_hash) {
+            if (!$admin || $request->password_lama != $admin->password_hash) {
                 return response()->json([
-                    'status' => false,
+                    'status'  => false,
                     'message' => 'Password lama salah'
                 ], 401);
             }
@@ -188,18 +204,24 @@ class AuthController extends Controller
                 ->where('id_admin', $adminId)
                 ->update([
                     'password_hash' => $request->password_baru,
-                    'updated_at' => now(),
+                    'updated_at'    => now(),
                 ]);
 
-            LogActivity::log($adminId, 'Ganti Password', 'Admin mengganti password');
+            try {
+                if (class_exists(LogActivity::class)) {
+                    LogActivity::log($adminId, 'Ganti Password', 'Admin mengganti password');
+                }
+            } catch (\Throwable $e) {
+                Log::warning('LogActivity error: ' . $e->getMessage());
+            }
 
             return response()->json([
-                'status' => true,
+                'status'  => true,
                 'message' => 'Password berhasil diganti'
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                'status' => false,
+                'status'  => false,
                 'message' => $e->getMessage()
             ], 500);
         }
@@ -210,7 +232,7 @@ class AuthController extends Controller
         try {
             if (!$request->hasFile('foto')) {
                 return response()->json([
-                    'status' => false,
+                    'status'  => false,
                     'message' => 'Tidak ada file yang diupload'
                 ], 400);
             }
@@ -223,7 +245,7 @@ class AuthController extends Controller
             
             if ($validator->fails()) {
                 return response()->json([
-                    'status' => false,
+                    'status'  => false,
                     'message' => $validator->errors()->first()
                 ], 422);
             }
@@ -253,17 +275,17 @@ class AuthController extends Controller
                 ->where('id_admin', $adminId)
                 ->update([
                     'foto_profil' => $url,
-                    'updated_at' => now(),
+                    'updated_at'  => now(),
                 ]);
             
             return response()->json([
-                'status' => true,
+                'status'  => true,
                 'message' => 'Foto profil berhasil diupload',
-                'url' => $url
+                'url'     => $url
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                'status' => false,
+                'status'  => false,
                 'message' => $e->getMessage()
             ], 500);
         }
@@ -272,7 +294,7 @@ class AuthController extends Controller
     public function logout(Request $request)
     {
         return response()->json([
-            'status' => true,
+            'status'  => true,
             'message' => 'Logout berhasil'
         ]);
     }
