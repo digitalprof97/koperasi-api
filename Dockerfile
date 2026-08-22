@@ -1,6 +1,5 @@
 FROM php:8.1-apache
 
-# Install dependensi sistem dan ekstensi database
 RUN apt-get update && apt-get install -y \
     libpng-dev \
     libonig-dev \
@@ -10,10 +9,8 @@ RUN apt-get update && apt-get install -y \
     git \
     && docker-php-ext-install pdo_mysql mbstring bcmath
 
-# Aktifkan rewrite module Apache
 RUN a2enmod rewrite
 
-# Buat konfigurasi VirtualHost lengkap untuk Laravel
 RUN printf '<VirtualHost *:80>\n\
     ServerAdmin webmaster@localhost\n\
     DocumentRoot /var/www/html/public\n\
@@ -26,16 +23,13 @@ RUN printf '<VirtualHost *:80>\n\
     CustomLog ${APACHE_LOG_DIR}/access.log combined\n\
 </VirtualHost>\n' > /etc/apache2/sites-available/000-default.conf
 
-# Pasang Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 COPY . /var/www/html
 
-# Install package Laravel
 RUN composer install --no-dev --optimize-autoloader
 
-# Atur permission storage dan cache
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 RUN chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
