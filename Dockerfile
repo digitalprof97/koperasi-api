@@ -1,36 +1,20 @@
-FROM php:8.1-apache
+FROM richarvey/nginx-php-fpm:latest
 
-# Install dependensi dan ekstensi pdo_mysql
-RUN apt-get update && apt-get install -y \
-    libpng-dev \
-    libonig-dev \
-    libxml2-dev \
-    zip \
-    unzip \
-    git \
-    && docker-php-ext-install pdo_mysql mbstring bcmath
+# Matikan script otomatis prestissimo/composer bawaan image yang error
+ENV RUN_SCRIPTS 0
+ENV WEBROOT /var/www/html/public
+ENV PHP_ERRORS_STDERR 1
+ENV REAL_IP_HEADER 1
+ENV COMPOSER_ALLOW_SUPERUSER 1
 
-# Aktifkan modul rewrite Apache untuk routing Laravel
-RUN a2enmod rewrite
+# Pasang ekstensi database MySQL
+RUN docker-php-ext-install pdo_mysql mbstring bcmath
 
-# Ubah DocumentRoot Apache langsung ke folder public Laravel
-ENV APACHE_DOCUMENT_ROOT /var/www/html/public
-RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
-RUN sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
-
-# Atur Apache agar mendengarkan port dinamis Railway ($PORT) atau 80
-RUN sed -i 's/80/${PORT}/g' /etc/apache2/sites-available/000-default.conf /etc/apache2/ports.conf
-
-# Install Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
-
-WORKDIR /var/www/html
 COPY . /var/www/html
+WORKDIR /var/www/html
 
-RUN composer install --no-dev --optimize-autoloader
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
-RUN chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+# Install composer dependency project kita sendiri
+RUN composer install --no-dev --optimize-autoloader --no-plugins --no-scripts
+RUN chmod -R 777 /var/www/html/storage /var/www/html/bootstrap/cache
 
 EXPOSE 80
-
-CMD ["apache2-foreground"]
