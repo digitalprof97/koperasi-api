@@ -1,36 +1,28 @@
-FROM richarvey/nginx-php-fpm:latest
+FROM php:8.1-cli
 
-# Konfigurasi Nginx & Laravel
-ENV WEBROOT /var/www/html/public
-ENV PHP_ERRORS_STDERR 1
-ENV RUN_SCRIPTS 1
-ENV REAL_IP_HEADER 1
+# Install dependensi sistem dan ekstensi MySQL
+RUN apt-get update && apt-get install -y \
+    libpng-dev \
+    libonig-dev \
+    libxml2-dev \
+    zip \
+    unzip \
+    git \
+    && docker-php-ext-install pdo_mysql mbstring
 
-# Konfigurasi routing Nginx agar URL diteruskan ke index.php Laravel
-ENV NGINX_SITES_AVAILABLE /etc/nginx/sites-available/default.conf
-ENV NGINX_SITES_ENABLED /etc/nginx/sites-enabled/default.conf
+# Pasang Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-COPY . /var/www/html
-WORKDIR /var/www/html
+WORKDIR /app
+COPY . .
 
-# Buat config Nginx untuk Laravel
-RUN printf '%s\n' \
-    'server {' \
-    '    listen 80;' \
-    '    root /var/www/html/public;' \
-    '    index index.php index.html;' \
-    '    charset utf-8;' \
-    '    location / {' \
-    '        try_files $uri $uri/ /index.php?$query_string;' \
-    '    }' \
-    '    location ~ \.php$ {' \
-    '        fastcgi_pass unix:/var/run/php-fpm.sock;' \
-    '        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;' \
-    '        include fastcgi_params;' \
-    '    }' \
-    '}' > /etc/nginx/sites-available/default.conf
-
+# Install dependensi Laravel
 RUN composer install --no-dev --optimize-autoloader
-RUN chmod -R 777 /var/www/html/storage /var/www/html/bootstrap/cache
 
-EXPOSE 80
+# Atur permission folder storage
+RUN chmod -R 777 storage bootstrap/cache
+
+EXPOSE 8080
+
+# Jalankan server bawaan PHP langsung mengarah ke file routing public/index.php
+CMD php -S 0.0.0.0:${PORT:-8080} -t public public/index.php
