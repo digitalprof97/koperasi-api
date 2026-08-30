@@ -55,8 +55,8 @@ class PinjamanController extends Controller
                 'p.*', 
                 'j.nama_lengkap', 
                 'j.no_anggota', 
-                'pr.nama_produk',
-                'p.jaminan',
+                'pr.nama_produk', 
+                'p.jaminan', 
                 'p.deskripsi_jaminan'
             )
             ->where('p.id_pinjaman', $id)
@@ -175,7 +175,7 @@ class PinjamanController extends Controller
     }
 
     /**
-     * FUNGSI UNTUK GENERATE ANGSURAN OTOMATIS
+     * FUNGSI UNTUK GENERATE ANGSURAN OTOMATIS (BUNGA 1.5%, TURUN KE 1.25% SETELAH 50% ANGSURAN)
      */
     private function generateAngsuran($pinjaman)
     {
@@ -193,18 +193,23 @@ class PinjamanController extends Controller
             ->where('id_produk_pinjaman', $pinjaman->id_produk_pinjaman)
             ->first();
         
-        // Hitung angsuran per bulan
-        $bungaPerBulan = $pinjaman->bunga_persen / 100;
         $pokokPerBulan = $pinjaman->jumlah_pinjaman / $pinjaman->tenor;
-        $bungaPerBulanNominal = $pinjaman->jumlah_pinjaman * $bungaPerBulan;
-        $angsuranPerBulan = $pokokPerBulan + $bungaPerBulanNominal + ($produk->biaya_admin ?? 0);
+        $biayaAdmin = $produk->biaya_admin ?? 0;
+        
+        // Titik tengah tenor untuk diskon bunga 1.25%
+        $halfTenor = ceil($pinjaman->tenor / 2);
         
         // Tanggal pengajuan sebagai dasar perhitungan jatuh tempo
         $tglPengajuan = $pinjaman->tgl_pengajuan;
         
-        // Looping untuk membuat angsuran
+        // Looping untuk membuat jadwal angsuran
         for ($i = 1; $i <= $pinjaman->tenor; $i++) {
             $tglJatuhTempo = date('Y-m-d', strtotime("+$i months", strtotime($tglPengajuan)));
+            
+            // Bunga 1.5% untuk paruh awal, 1.25% setelah paruh pertama
+            $currentBungaRate = ($i > $halfTenor) ? 0.0125 : 0.015;
+            $bungaPerBulanNominal = $pinjaman->jumlah_pinjaman * $currentBungaRate;
+            $angsuranPerBulan = $pokokPerBulan + $bungaPerBulanNominal + $biayaAdmin;
             
             DB::table('tb_angsuran')->insert([
                 'id_pinjaman' => $pinjaman->id_pinjaman,
