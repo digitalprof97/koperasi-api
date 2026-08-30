@@ -35,21 +35,21 @@ Route::prefix('admin')->group(function () {
     Route::get('/produk-pinjaman', [ProdukPinjamanController::class, 'index']);
     Route::get('/produk-pinjaman/{id}', [ProdukPinjamanController::class, 'show']);
     Route::post('/produk-pinjaman', [ProdukPinjamanController::class, 'store']);
-    Route::put('/produk-pinjaman/{id}', [ProdukPinjamanController::class, 'update']);
+    Route::match(['put', 'post'], '/produk-pinjaman/{id}', [ProdukPinjamanController::class, 'update']);
     Route::delete('/produk-pinjaman/{id}', [ProdukPinjamanController::class, 'destroy']);
     
     // Metode Bayar
     Route::get('/metode-bayar', [MetodeBayarController::class, 'index']);
     Route::get('/metode-bayar/{id}', [MetodeBayarController::class, 'show']);
     Route::post('/metode-bayar', [MetodeBayarController::class, 'store']);
-    Route::put('/metode-bayar/{id}', [MetodeBayarController::class, 'update']);
+    Route::match(['put', 'post'], '/metode-bayar/{id}', [MetodeBayarController::class, 'update']);
     Route::delete('/metode-bayar/{id}', [MetodeBayarController::class, 'destroy']);
     
     // Jemaat
     Route::get('/jemaat', [JemaatController::class, 'index']);
     Route::get('/jemaat/{id}', [JemaatController::class, 'show']);
     Route::post('/jemaat', [JemaatController::class, 'store']);
-    Route::put('/jemaat/{id}', [JemaatController::class, 'update']);
+    Route::match(['put', 'post'], '/jemaat/{id}', [JemaatController::class, 'update']);
     Route::delete('/jemaat/{id}', [JemaatController::class, 'destroy']);
     
     // Laporan
@@ -86,8 +86,8 @@ Route::prefix('admin')->group(function () {
 // ============ ROUTE UNTUK JEMAAT ============
 Route::prefix('jemaat')->group(function () {
     Route::get('/profil', [JemaatAuthController::class, 'profil']);
-     Route::post('/profil/ganti-password', [JemaatAuthController::class, 'gantiPassword']);
-     Route::post('/profil/update', [JemaatAuthController::class, 'updateProfil']); // 🔥 TAMBAHKAN INI
+    Route::post('/profil/ganti-password', [JemaatAuthController::class, 'gantiPassword']);
+    Route::post('/profil/update', [JemaatAuthController::class, 'updateProfil']);
     Route::post('/profil/upload-foto', [JemaatAuthController::class, 'uploadFoto']);
     Route::get('/pinjaman', [JemaatAuthController::class, 'pinjamanSaya']);
     Route::get('/simpanan', [JemaatAuthController::class, 'simpananSaya']);
