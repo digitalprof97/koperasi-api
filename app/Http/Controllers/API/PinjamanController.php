@@ -175,8 +175,8 @@ class PinjamanController extends Controller
     }
 
     /**
-     * FUNGSI UNTUK GENERATE ANGSURAN OTOMATIS (BUNGA MENURUN DARI SISA POKOK)
-     * Bunga awal 1.5% dari sisa pokok, turun ke 1.25% dari sisa pokok setelah 50% tenor terlewati.
+     * FUNGSI UNTUK GENERATE ANGSURAN OTOMATIS (BUNGA MENURUN TIAP BULAN)
+     * Bunga dihitung dari sisa saldo pokok pinjaman pada setiap bulan
      */
     private function generateAngsuran($pinjaman)
     {
@@ -199,20 +199,22 @@ class PinjamanController extends Controller
         $pokokPerBulan = $totalPinjaman / $tenor;
         $biayaAdmin = $produk->biaya_admin ?? 0;
         
-        // Titik tengah tenor untuk diskon suku bunga
+        // Titik tengah tenor untuk diskon suku bunga ke 1.25%
         $halfTenor = ceil($tenor / 2);
         
         // Tanggal pengajuan sebagai dasar perhitungan jatuh tempo
         $tglPengajuan = $pinjaman->tgl_pengajuan;
         
-        // Sisa pokok pinjaman berjalan
+        // Saldo pokok berjalan yang berkurang tiap bulan
         $sisaPokok = $totalPinjaman;
         
         for ($i = 1; $i <= $tenor; $i++) {
             $tglJatuhTempo = date('Y-m-d', strtotime("+$i months", strtotime($tglPengajuan)));
             
-            // Suku bunga: 1.5% pada paruh pertama, 1.25% setelah paruh pertama (dihitung dari sisa pokok)
+            // Suku bunga: 1.5% di paruh awal, 1.25% setelah paruh pertama terlewati
             $rate = ($i > $halfTenor) ? 0.0125 : 0.015;
+            
+            // Bunga = Sisa pokok pinjaman x Suku bunga bulan ini
             $bungaNominal = round($sisaPokok * $rate, 2);
             $totalAngsuranBulanIni = round($pokokPerBulan + $bungaNominal + $biayaAdmin, 2);
             
@@ -228,7 +230,7 @@ class PinjamanController extends Controller
                 'created_at' => now(),
             ]);
             
-            // Kurangi sisa pokok untuk perhitungan bunga bulan berikutnya
+            // Kurangi sisa pokok pinjaman dengan pembayaran pokok bulan ini
             $sisaPokok -= $pokokPerBulan;
             if ($sisaPokok < 0) {
                 $sisaPokok = 0;
