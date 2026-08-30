@@ -107,7 +107,6 @@ class MetodeBayarController extends Controller
                 'bank_nama' => $request->bank_nama,
                 'is_qris' => $isQris,
                 'qr_code_data' => $request->qr_code_data,
-                'created_at' => now(),
             ]);
 
             try {
@@ -185,7 +184,6 @@ class MetodeBayarController extends Controller
                     'bank_nama' => $request->bank_nama,
                     'is_qris' => $isQris,
                     'qr_code_data' => $request->qr_code_data,
-                    'updated_at' => now(),
                 ]);
 
             try {
