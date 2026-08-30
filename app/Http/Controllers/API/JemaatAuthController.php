@@ -133,7 +133,7 @@ class JemaatAuthController extends Controller
     }
     
     /**
-     * Ajukan pinjaman baru (DENGAN DANA RESIKO 1%)
+     * Ajukan pinjaman baru (DENGAN DANA RESIKO 1%, ATURAN TENOR & BUNGA 1.5% - 1.25%)
      */
     public function ajukanPinjaman(Request $request)
     {
@@ -155,6 +155,20 @@ class JemaatAuthController extends Controller
                 ], 422);
             }
 
+            $jumlahPinjaman = (float) $request->jumlah_pinjaman;
+            $tenor = (int) $request->tenor;
+
+            // Validasi tenor: di bawah 10 jt max 20 bln, di atas/sama dengan 10 jt max 60 bln
+            $maxTenor = ($jumlahPinjaman < 10000000) ? 20 : 60;
+            if ($tenor > $maxTenor) {
+                return response()->json([
+                    'status' => false,
+                    'message' => ($jumlahPinjaman < 10000000)
+                        ? 'Pinjaman di bawah Rp 10.000.000 maksimal tenor 20 bulan'
+                        : 'Pinjaman Rp 10.000.000 ke atas maksimal tenor 60 bulan'
+                ], 400);
+            }
+
             // Ambil ID jemaat dari token bearer secara aman
             $token = $request->bearerToken();
             $parts = explode('|', $token);
@@ -173,15 +187,15 @@ class JemaatAuthController extends Controller
                 ], 404);
             }
             
-            // Validasi jumlah pinjaman
-            if ($request->jumlah_pinjaman < $produk->minimal_pinjaman) {
+            // Validasi batas minimal dan maksimal produk
+            if ($jumlahPinjaman < $produk->minimal_pinjaman) {
                 return response()->json([
                     'status' => false,
                     'message' => 'Jumlah pinjaman minimal Rp ' . number_format($produk->minimal_pinjaman, 0, ',', '.')
                 ], 400);
             }
             
-            if ($request->jumlah_pinjaman > $produk->maksimal_pinjaman) {
+            if ($jumlahPinjaman > $produk->maksimal_pinjaman) {
                 return response()->json([
                     'status' => false,
                     'message' => 'Jumlah pinjaman maksimal Rp ' . number_format($produk->maksimal_pinjaman, 0, ',', '.')
@@ -195,7 +209,6 @@ class JemaatAuthController extends Controller
                 @mkdir($targetDir, 0777, true);
             }
 
-            // 1. Cek via Laravel Request hasFile
             if ($request->hasFile('jaminan')) {
                 $file = $request->file('jaminan');
                 if ($file && $file->isValid()) {
@@ -205,7 +218,6 @@ class JemaatAuthController extends Controller
                 }
             }
 
-            // 2. Cek via global $_FILES PHP murni jika request->hasFile belum tertangkap
             if (!$urlJaminan && !empty($_FILES)) {
                 foreach ($_FILES as $key => $fileData) {
                     if (isset($fileData['tmp_name']) && is_uploaded_file($fileData['tmp_name'])) {
@@ -224,16 +236,17 @@ class JemaatAuthController extends Controller
                 }
             }
 
-            // Hitung angsuran
-            $bungaPerBulan = ($produk->bunga_persen ?? 1.0) / 100;
-            $pokokPerBulan = $request->jumlah_pinjaman / $request->tenor;
-            $bungaPerBulanNominal = $request->jumlah_pinjaman * $bungaPerBulan;
+            // Aturan bunga 1.5% per bulan
+            $bungaPersen = 1.5;
+            $bungaPerBulan = $bungaPersen / 100;
+            $pokokPerBulan = $jumlahPinjaman / $tenor;
+            $bungaPerBulanNominal = $jumlahPinjaman * $bungaPerBulan;
             $angsuranPerBulan = $pokokPerBulan + $bungaPerBulanNominal + ($produk->biaya_admin ?? 0);
             
             // Hitung Dana Risiko 1% dan Dana Bersih Diterima 99%
-            $danaResiko = round($request->jumlah_pinjaman * 0.01, 2);
-            $danaDiterima = round($request->jumlah_pinjaman - $danaResiko, 2);
-            $keteranganResiko = 'Dipotong 1% (Rp ' . number_format($danaResiko, 0, ',', '.') . ') sebagai dana risiko pinjaman. Peminjam menerima 99% (Rp ' . number_format($danaDiterima, 0, ',', '.') . ') dari total pinjaman.';
+            $danaResiko = round($jumlahPinjaman * 0.01, 2);
+            $danaDiterima = round($jumlahPinjaman - $danaResiko, 2);
+            $keteranganResiko = 'Dipotong 1% (Rp ' . number_format($danaResiko, 0, ',', '.') . ') sebagai dana risiko pinjaman. Peminjam menerima 99% (Rp ' . number_format($danaDiterima, 0, ',', '.') . ') dari total pinjaman. Bunga awal 1.5%/bln, turun menjadi 1.25%/bln setelah pembayaran mencapai 50%.';
 
             // Buat kode pinjaman
             $kodePinjaman = 'PJM' . date('Ymd') . rand(100, 999);
@@ -243,9 +256,9 @@ class JemaatAuthController extends Controller
                 'id_jemaat' => $jemaatId,
                 'id_produk_pinjaman' => $request->id_produk_pinjaman,
                 'kode_pinjaman' => $kodePinjaman,
-                'jumlah_pinjaman' => $request->jumlah_pinjaman,
-                'tenor' => $request->tenor,
-                'bunga_persen' => $produk->bunga_persen ?? 1.0,
+                'jumlah_pinjaman' => $jumlahPinjaman,
+                'tenor' => $tenor,
+                'bunga_persen' => $bungaPersen,
                 'biaya_admin' => $produk->biaya_admin ?? 0,
                 'biaya_asuransi' => 0.00,
                 'angsuran_per_bulan' => $angsuranPerBulan,
