@@ -76,7 +76,7 @@ class MetodeBayarController extends Controller
                 'nama_metode' => 'required|string|max:50|unique:tb_metode_pembayaran,nama_metode',
                 'kode_metode' => 'required|string|max:20',
                 'biaya_admin_persen' => 'required|numeric|min:0',
-                'is_active' => 'required',
+                'is_active' => 'nullable',
                 'urutan' => 'required|integer|min:0',
                 'atas_nama' => 'nullable|string|max:100',
                 'nomor_rekening' => 'nullable|string|max:50',
@@ -88,13 +88,13 @@ class MetodeBayarController extends Controller
             if ($validator->fails()) {
                 return response()->json([
                     'status' => false,
-                    'message' => 'Validasi gagal',
+                    'message' => $validator->errors()->first(),
                     'errors' => $validator->errors()
                 ], 422);
             }
 
-            $isActive = filter_var($request->is_active, FILTER_VALIDATE_BOOLEAN) ? 1 : 0;
-            $isQris = filter_var($request->is_qris, FILTER_VALIDATE_BOOLEAN) ? 1 : 0;
+            $isActive = filter_var($request->input('is_active', true), FILTER_VALIDATE_BOOLEAN) ? 1 : 0;
+            $isQris = filter_var($request->input('is_qris', false), FILTER_VALIDATE_BOOLEAN) ? 1 : 0;
 
             $id = DB::table('tb_metode_pembayaran')->insertGetId([
                 'nama_metode' => $request->nama_metode,
@@ -111,10 +111,10 @@ class MetodeBayarController extends Controller
             ]);
 
             try {
-                LogActivity::log(1, 'Tambah Metode Bayar', 'Menambah metode pembayaran: ' . $request->nama_metode . ' (' . $request->kode_metode . ')');
-            } catch (\Exception $logEx) {
-                // Jangan gagalkan transaksi jika log helper error
-            }
+                if (class_exists('App\Helpers\LogActivity')) {
+                    LogActivity::log(1, 'Tambah Metode Bayar', 'Menambah metode pembayaran: ' . $request->nama_metode . ' (' . $request->kode_metode . ')');
+                }
+            } catch (\Exception $logEx) {}
 
             return response()->json([
                 'status' => true,
@@ -137,7 +137,7 @@ class MetodeBayarController extends Controller
                 'nama_metode' => 'required|string|max:50',
                 'kode_metode' => 'required|string|max:20',
                 'biaya_admin_persen' => 'required|numeric|min:0',
-                'is_active' => 'required',
+                'is_active' => 'nullable',
                 'urutan' => 'required|integer|min:0',
                 'atas_nama' => 'nullable|string|max:100',
                 'nomor_rekening' => 'nullable|string|max:50',
@@ -149,7 +149,7 @@ class MetodeBayarController extends Controller
             if ($validator->fails()) {
                 return response()->json([
                     'status' => false,
-                    'message' => 'Validasi gagal',
+                    'message' => $validator->errors()->first(),
                     'errors' => $validator->errors()
                 ], 422);
             }
@@ -165,13 +165,12 @@ class MetodeBayarController extends Controller
                 ], 404);
             }
 
-            // Ambil data lama untuk log
             $metodeLama = DB::table('tb_metode_pembayaran')
                 ->where('id_metode', $id)
                 ->first();
 
-            $isActive = filter_var($request->is_active, FILTER_VALIDATE_BOOLEAN) ? 1 : 0;
-            $isQris = filter_var($request->is_qris, FILTER_VALIDATE_BOOLEAN) ? 1 : 0;
+            $isActive = filter_var($request->input('is_active', true), FILTER_VALIDATE_BOOLEAN) ? 1 : 0;
+            $isQris = filter_var($request->input('is_qris', false), FILTER_VALIDATE_BOOLEAN) ? 1 : 0;
 
             DB::table('tb_metode_pembayaran')
                 ->where('id_metode', $id)
@@ -190,10 +189,10 @@ class MetodeBayarController extends Controller
                 ]);
 
             try {
-                LogActivity::log(1, 'Edit Metode Bayar', 'Mengedit metode pembayaran ID: ' . $id . ' dari "' . ($metodeLama->nama_metode ?? '') . '" menjadi "' . $request->nama_metode . '"');
-            } catch (\Exception $logEx) {
-                // Jangan gagalkan transaksi jika log helper error
-            }
+                if (class_exists('App\Helpers\LogActivity')) {
+                    LogActivity::log(1, 'Edit Metode Bayar', 'Mengedit metode pembayaran ID: ' . $id . ' dari "' . ($metodeLama->nama_metode ?? '') . '" menjadi "' . $request->nama_metode . '"');
+                }
+            } catch (\Exception $logEx) {}
 
             return response()->json([
                 'status' => true,
@@ -222,7 +221,6 @@ class MetodeBayarController extends Controller
                 ], 404);
             }
 
-            // Ambil data untuk log sebelum dihapus
             $metode = DB::table('tb_metode_pembayaran')
                 ->where('id_metode', $id)
                 ->first();
@@ -232,10 +230,10 @@ class MetodeBayarController extends Controller
                 ->delete();
 
             try {
-                LogActivity::log(1, 'Hapus Metode Bayar', 'Menghapus metode pembayaran: ' . ($metode->nama_metode ?? 'ID: ' . $id));
-            } catch (\Exception $logEx) {
-                // Jangan gagalkan transaksi jika log helper error
-            }
+                if (class_exists('App\Helpers\LogActivity')) {
+                    LogActivity::log(1, 'Hapus Metode Bayar', 'Menghapus metode pembayaran: ' . ($metode->nama_metode ?? 'ID: ' . $id));
+                }
+            } catch (\Exception $logEx) {}
 
             return response()->json([
                 'status' => true,
