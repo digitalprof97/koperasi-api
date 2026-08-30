@@ -133,7 +133,7 @@ class JemaatAuthController extends Controller
     }
     
     /**
-     * Ajukan pinjaman baru (DENGAN DANA RESIKO 1%, ATURAN TENOR & BUNGA MENURUN 1.5% - 1.25%)
+     * Ajukan pinjaman baru (DENGAN DANA RESIKO 1%, ATURAN TENOR & BUNGA MENURUN TIAP BULAN)
      */
     public function ajukanPinjaman(Request $request)
     {
@@ -236,16 +236,16 @@ class JemaatAuthController extends Controller
                 }
             }
 
-            // Perhitungan bunga awal bulan pertama (1.5% dari sisa pokok awal)
+            // Perhitungan estimasi angsuran bulan ke-1 (Bunga 1.5% dari seluruh sisa pokok awal)
             $bungaPersen = 1.5;
             $pokokPerBulan = $jumlahPinjaman / $tenor;
             $bungaBulanPertama = $jumlahPinjaman * ($bungaPersen / 100);
-            $angsuranPerBulanAwal = $pokokPerBulan + $bungaBulanPertama + ($produk->biaya_admin ?? 0);
+            $angsuranBulanPertama = $pokokPerBulan + $bungaBulanPertama + ($produk->biaya_admin ?? 0);
             
             // Hitung Dana Risiko 1% dan Dana Bersih Diterima 99%
             $danaResiko = round($jumlahPinjaman * 0.01, 2);
             $danaDiterima = round($jumlahPinjaman - $danaResiko, 2);
-            $keteranganResiko = 'Dipotong 1% (Rp ' . number_format($danaResiko, 0, ',', '.') . ') sebagai dana risiko pinjaman. Peminjam menerima 99% (Rp ' . number_format($danaDiterima, 0, ',', '.') . ') dari total pinjaman. Suku bunga menurun dari sisa pokok: 1.5%/bln di awal, turun ke 1.25%/bln setelah melewati 50% tenor.';
+            $keteranganResiko = 'Dipotong 1% (Rp ' . number_format($danaResiko, 0, ',', '.') . ') sebagai dana risiko pinjaman. Peminjam menerima 99% (Rp ' . number_format($danaDiterima, 0, ',', '.') . ') dari total pinjaman. Suku bunga menurun setiap bulan: 1.5% dari sisa pokok di awal, turun ke 1.25% setelah melewati 50% pembayaran.';
 
             // Buat kode pinjaman
             $kodePinjaman = 'PJM' . date('Ymd') . rand(100, 999);
@@ -260,7 +260,7 @@ class JemaatAuthController extends Controller
                 'bunga_persen' => $bungaPersen,
                 'biaya_admin' => $produk->biaya_admin ?? 0,
                 'biaya_asuransi' => 0.00,
-                'angsuran_per_bulan' => $angsuranPerBulanAwal,
+                'angsuran_per_bulan' => $angsuranBulanPertama,
                 'status' => 'diajukan',
                 'tgl_pengajuan' => date('Y-m-d'),
                 'jaminan' => $urlJaminan,
